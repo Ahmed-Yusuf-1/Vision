@@ -60,24 +60,10 @@ export default function WelcomeScreen() {
 
     return (
         <View style={styles.container}>
-            {/* <VideoBackground />  // Assuming VideoBackground is a valid component */}
-            {/* <Text style={styles.welcomeText}>Welcome Back, User</Text> */}
-
-            {!currentEmotion ? (
-                <>
                     <TouchableOpacity style={styles.logoContainer} onPress={HandleAnalyzeMood}>
                         <Image style={styles.logo} source={require('../assets/images/vision.png')} />
                     </TouchableOpacity>
                     <Text style={styles.promptText}>Press the button above to start.</Text>
-                </>
-            ) : (
-                <View style={styles.resultsContainer}>
-                    <Text style={styles.emotionText}> You Look {currentEmotion?.toLowerCase()}:</Text>
-                    <TouchableOpacity style={styles.retryButton} onPress={HandleAnalyzeMood}>
-                        <Text style={styles.retryButtonText}>Analyze Again</Text>
-                    </TouchableOpacity>
-                </View>
-            )}
         </View>
     );
 }
@@ -87,7 +73,7 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'transparent', // Assuming a VideoBackground component provides the background
+        backgroundColor: '#181313ff', // Assuming a VideoBackground component provides the background
         paddingTop: 80,
     },
     welcomeText: {
@@ -108,7 +94,7 @@ const styles = StyleSheet.create({
         resizeMode: 'contain',
     },
     promptText: {
-        color: 'Black',
+        color: 'white',
         fontSize: 22,
         textAlign: 'center',
     },
@@ -120,7 +106,7 @@ const styles = StyleSheet.create({
         marginTop: 20,
     },
     emotionText: {
-        color: 'black',
+        color: 'white',
         fontSize: 24, // Made text slightly larger for emphasis
         fontWeight: 'bold',
         textAlign: 'center',

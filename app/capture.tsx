@@ -77,7 +77,7 @@ export default function CaptureScreen() {
         return (
             <View style={styles.analyzingContainer}>
                 <ActivityIndicator size="large" color="#fff" />
-                <Text style={styles.analyzingText}>Analyzing your mood...</Text>
+                <Text style={styles.analyzingText}>Analyzing...</Text>
             </View>
         );
     }
