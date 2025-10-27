@@ -1,84 +1,84 @@
 // In lib/gemini.ts
+import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } from "@google/generative-ai";
 import { geminiConfig } from '../config';
 
-interface GeminiResponse {
-  candidates: Array<{
-    content: {
-      parts: Array<{ text: string }>;
-    };
-  }>;
-}
+// --- Initialize Gemini ---
+// Access your API key (see "Set up your API key" above)
+const genAI = new GoogleGenerativeAI(geminiConfig.apiKey);
 
+// --- Model Configuration (Optional but Recommended) ---
+const generationConfig = {
+  // temperature: 1, // Example: Adjust creativity (0 = deterministic, 1 = creative)
+  // topP: 0.95,     // Example: Nucleus sampling
+  // topK: 64,       // Example: Top-K sampling
+  maxOutputTokens: 100, // Limit response length
+  // responseMimeType: "text/plain", // Keep response simple
+};
+
+// --- Safety Settings (Optional but Recommended) ---
+const safetySettings = [
+  {
+    category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+    threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+    threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+    threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+    threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+  },
+];
+
+
+// --- Define the function ---
 export async function getRefinedObjectLabel(labels: string[]): Promise<string | null> {
   if (!labels || labels.length === 0) {
     return null;
   }
 
-  const labelList = labels.join(', ');
-  const prompt = `Given the following labels detected in an image: [${labelList}], identify the single most specific and likely physical object being shown. Prioritize common, tangible items. Return only the name of that single object. If no single specific object seems likely, return "Objects".`;
-
-  const requestBody = {
-    contents: [{ parts: [{ text: prompt }] }],
-    // generationConfig: { // Optional: Adjust if needed
-    //   temperature: 0.5,
-    // }
-  };
-
-  let responseText = ''; // Variable to hold raw response text
+  // Choose the model - START WITH THIS ONE, then try others if needed
+  // Common models: "gemini-1.5-flash-latest", "gemini-pro"
+  // Verify the exact name available to you in Google AI Studio / Cloud Console
+  const modelName = "gemini-2.5-flash-lite"; // *** TRY THIS FIRST ***
+  // const modelName = "gemini-pro"; // Example alternative
 
   try {
-    const response = await fetch(`${geminiConfig.apiUrl}?key=${geminiConfig.apiKey}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      // Pass generationConfig and safetySettings
+      generationConfig,
+      safetySettings,
     });
 
-    // --- Improvement Start ---
-    // 1. Get the raw text first, regardless of status
-    responseText = await response.text();
-    console.log("Raw Gemini API Response Text:", responseText); // Log the raw response
+    const labelList = labels.join(', ');
+    const prompt = `Given the following labels detected in an image: [${labelList}], identify the single most specific and likely physical object being shown. Prioritize common, tangible items. Return only the name of that single object. If no single specific object seems likely, return "Objects".`;
 
-    // 2. Check response.ok AFTER getting text
-    if (!response.ok) {
-      // Try to parse the error text as JSON, but handle if it's not JSON
-      let errorDetails = responseText;
-      try {
-        errorDetails = JSON.stringify(JSON.parse(responseText)); // Pretty print if JSON
-      } catch (parseError) {
-        // Ignore parsing error, just use the raw text
+    console.log(`Sending prompt to ${modelName}:`, prompt); // Log the prompt
+
+    const result = await model.generateContent(prompt);
+    const response = result.response; // Use await here
+    const refinedLabel = response.text().trim(); // Get text response
+
+    console.log("Gemini SDK Response Text:", refinedLabel);
+
+    // Basic validation or return "Objects" if response is weird/empty
+    return refinedLabel && refinedLabel.length < 50 && refinedLabel.length > 0 ? refinedLabel : "Objects";
+
+  } catch (error: any) {
+  
+      // --- Error Handling ---
+      console.error(`Error calling Gemini API (${modelName}):`, error);
+      // Check for specific API errors if possible (structure might vary)
+      if (error.message) {
+           console.error("Gemini Error Message:", error.message);
       }
-      console.error("Gemini API Error Response:", errorDetails);
-      throw new Error(`Gemini API request failed with status ${response.status}`);
-    }
-
-    // 3. Try parsing the successful response text, catch JSON errors
-    let data: GeminiResponse;
-    try {
-        if (responseText.trim() === '') {
-             throw new Error("Received empty response body from Gemini API");
-        }
-        data = JSON.parse(responseText);
-    } catch (parseError: any) {
-        console.error("Failed to parse Gemini API JSON response:", parseError);
-        console.error("Original response text was:", responseText); // Log again for context
-        throw new Error(`Failed to parse Gemini response: ${parseError.message}`);
-    }
-    // --- Improvement End ---
-
-    const refinedLabel = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-    console.log("Gemini Refined Label:", refinedLabel);
-
-    return refinedLabel && refinedLabel.length < 50 ? refinedLabel : "Objects"; // Keep validation
-
-  } catch (error) {
-    console.error("Error calling/processing Gemini API:", error);
-    // Log the raw text again if available in case of network errors during fetch
-    if (responseText) {
-        console.error("Raw response text on error:", responseText);
-    }
-    return null; // Return null on any error during the process
+      // You might want to check error.status or error.code if they exist
+       return null; // Return null on error
   }
 }

@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native"; // Added ActivityIndicator
+import { ActivityIndicator, Alert, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native"; // Added ActivityIndicator
 import { getRefinedObjectLabel } from "../lib/gemini"; // Import the new function
 
 // Define states that indicate no specific emotion was detected
@@ -193,24 +193,10 @@ export default function WelcomeScreen() {
     // Main render logic (remains the same)
     return (
         <View style={styles.container}>
-            {primaryDetection === 'initial' ? (
-                <>
                     <TouchableOpacity style={styles.logoContainer} onPress={HandleAnalyzeAgain}>
                         <Image style={styles.logo} source={require('../assets/images/vision.png')} />
                     </TouchableOpacity>
-                    <Text style={styles.promptText}>Tap the logo to analyze your surroundings.</Text>
-                </>
-            ) : (
-                <ScrollView contentContainerStyle={styles.resultsContainer}>
-                    {renderResults()}
-                    {/* Don't show button while refining */}
-                    {!isRefiningLabel && (
-                        <TouchableOpacity style={styles.retryButton} onPress={HandleAnalyzeAgain}>
-                            <Text style={styles.retryButtonText}>Analyze Again</Text>
-                        </TouchableOpacity>
-                    )}
-                </ScrollView>
-            )}
+                    <Text style={styles.promptText}>Tap the logo to analyze your surroundings or your emotion.</Text>
         </View>
     );
 }
@@ -221,7 +207,7 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#f0f0f0',
+        backgroundColor: '#141414ff',
         paddingTop: 60,
         paddingHorizontal: 20,
     },
@@ -236,8 +222,8 @@ const styles = StyleSheet.create({
         resizeMode: 'contain',
     },
     promptText: {
-        color: '#333',
-        fontSize: 18,
+        color: '#ffffffff',
+        fontSize: 15,
         textAlign: 'center',
         marginTop: 10,
     },
