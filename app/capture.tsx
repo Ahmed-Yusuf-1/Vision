@@ -4,7 +4,8 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Button, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { analyzeImageForEmotion } from '../lib/rekognition';
+// Import the analysis functions
+import { analyzeImageForEmotion, analyzeImageForObjects } from '../lib/rekognition';
 
 export default function CaptureScreen() {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -39,40 +40,62 @@ export default function CaptureScreen() {
             return;
         }
 
+        // --- Correction Start ---
+        // Capture the picture *before* setting isAnalyzing to true
         try {
-            // Take the picture before changing any state to prevent re-render interruptions.
             const picture = await camera.takePictureAsync({
                 quality: 0.7,
                 skipProcessing: false,
-                shutterSound: false,
+                shutterSound: false, // Note: shutterSound might not work reliably
             });
 
             if (!picture || !picture.uri) {
+                // Use a more specific error if URI is missing
                 throw new Error("Failed to save picture, URI is missing.");
             }
-            
+
+            // NOW set analyzing state and proceed
             setIsAnalyzing(true);
 
             const base64 = await FileSystem.readAsStringAsync(picture.uri, {
                 encoding: 'base64',
             });
 
-            if (!base64) {
+             if (!base64) {
                  throw new Error("Failed to get base64 data from file system.");
             }
+            // --- Correction End ---
 
-            const emotion = await analyzeImageForEmotion(base64);
-            console.log('Detected Emotion:', emotion);
+            // Perform both analyses concurrently
+            const [emotionResult, objectsResult] = await Promise.all([
+                analyzeImageForEmotion(base64),
+                analyzeImageForObjects(base64)
+            ]);
 
-            router.replace({ pathname: '/', params: { emotion: emotion || 'DEFAULT' } });
+            console.log('Detected Emotion:', emotionResult);
+            console.log('Detected Objects:', objectsResult);
+
+            const objectNames = objectsResult
+                .map(label => label.Name)
+                .filter((name): name is string => name !== undefined);
+
+            router.replace({
+                pathname: '/',
+                params: {
+                    emotion: emotionResult || 'DEFAULT',
+                    objects: objectNames.join(','),
+                }
+            });
 
         } catch (error) {
             console.error("Error during picture capture or analysis:", error);
+            // Display a generic error message, the specific error is logged
             alert('Could not take or analyze picture. Please try again.');
+            // Ensure analyzing state is reset in case of error
             setIsAnalyzing(false);
         }
     };
-    
+
     if (isAnalyzing) {
         return (
             <View style={styles.analyzingContainer}>
@@ -84,33 +107,34 @@ export default function CaptureScreen() {
 
     return (
         <View style={styles.container}>
-            <CameraView 
-                style={styles.camera} 
-                facing={facing} 
+            <CameraView
+                style={styles.camera}
+                facing={facing}
                 ref={cameraRef}
                 onCameraReady={() => setIsCameraReady(true)}
-                active={isFocused}
+                active={isFocused} // Use 'active' prop
             >
                 <View style={styles.controlsContainer}>
                     <TouchableOpacity style={styles.flipButton} onPress={toggleCameraFacing}>
                         <Image style={styles.flipImage} source={require('../assets/images/CameraFlip.png')} />
                     </TouchableOpacity>
 
-                    <TouchableOpacity 
-                        style={[styles.captureButton, !isCameraReady && { opacity: 0.5 }]} 
+                    <TouchableOpacity
+                        style={[styles.captureButton, (!isCameraReady || isAnalyzing) && { opacity: 0.5 }]}
                         onPress={takePictureAndAnalyze}
                         disabled={!isCameraReady || isAnalyzing}
                     >
                         <View style={styles.captureButtonInner} />
                     </TouchableOpacity>
-                    
-                    <View style={styles.flipButton} /> 
+
+                    <View style={styles.flipButton} />
                 </View>
             </CameraView>
         </View>
     );
 }
 
+// --- Styles remain the same ---
 const styles = StyleSheet.create({
     container: {
         flex: 1,
@@ -138,7 +162,7 @@ const styles = StyleSheet.create({
         width: '90%',
         height: '90%',
         resizeMode: 'contain',
-        tintColor: 'white', 
+        tintColor: 'white',
     },
     captureButton: {
         width: 70,
@@ -163,8 +187,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#11161a',
     },
     permissionText: {
-        color: 'white', 
-        fontSize: 18, 
+        color: 'white',
+        fontSize: 18,
         marginBottom: 12,
         textAlign: 'center',
         paddingHorizontal: 20,

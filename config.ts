@@ -19,6 +19,10 @@ export const awsConfig = {
 export const spotifyConfig = {
   clientId: getExtraVar<string>('EXPO_PUBLIC_SPOTIFY_CLIENT_ID'),
 };
+export const geminiConfig = {
+  apiKey: getExtraVar<string>('EXPO_PUBLIC_GEMINI_API_KEY'),
+  apiUrl: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash` // Example for Flash
+};
 
 // This code is provided from AI
 // type AI used Gemini 2.5 pro
