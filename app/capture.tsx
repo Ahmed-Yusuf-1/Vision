@@ -13,7 +13,7 @@ export default function CaptureScreen() {
     const [permission, requestPermission] = useCameraPermissions();
     const router = useRouter();
     const cameraRef = useRef<CameraView>(null);
-    const [facing, setFacing] = useState<'front' | 'back'>('front');
+    const [facing, setFacing] = useState<'front' | 'back'>('back');
     const isFocused = useIsFocused();
 
     function toggleCameraFacing() {
@@ -145,10 +145,10 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
     },
     controlsContainer: {
-        flexDirection: 'row',
+        flexDirection: 'row-reverse',
         justifyContent: 'space-around',
         alignItems: 'center',
-        backgroundColor: 'rgba(0,0,0,0.4)',
+        backgroundColor: 'rgba(0, 0, 0, 0.28)',
         paddingVertical: 20,
         paddingBottom: 40,
     },
@@ -169,8 +169,8 @@ const styles = StyleSheet.create({
         height: 70,
         borderRadius: 35,
         backgroundColor: 'transparent',
-        borderWidth: 4,
-        borderColor: 'white',
+        borderWidth: 3,
+        borderColor: '#9fa2a5ff',
         justifyContent: 'center',
         alignItems: 'center',
     },

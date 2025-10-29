@@ -6,6 +6,16 @@ import { getRefinedObjectLabel } from "../lib/gemini"; // Import the new functio
 // Define states that indicate no specific emotion was detected
 const NON_SPECIFIC_EMOTION_STATES = ['NEUTRAL', 'DEFAULT'];
 
+function getRandomArrayElement<T>(arr: T[]): T | undefined {
+    if (!arr || arr.length === 0) return undefined;
+    const index = Math.floor(Math.random() * arr.length);
+    return arr[index];
+}
+
+const choices = ["think", "believe", "suspect"];
+const randomChoice = getRandomArrayElement(choices)
+console.log(randomChoice)
+
 export default function WelcomeScreen() {
     const router = useRouter();
     const { emotion, objects } = useLocalSearchParams<{ emotion?: string; objects?: string }>();
@@ -23,6 +33,7 @@ export default function WelcomeScreen() {
         let emotionResult: string | null = null;
         let objectList: string[] = [];
         let isSpecificEmotion = false;
+        
 
         // Reset refined label on new analysis
         setRefinedObjectLabel(null);
@@ -111,7 +122,7 @@ export default function WelcomeScreen() {
 
         if (refinedLabel) {
             // Use the single refined label from Gemini
-            alertMessage = `I think that's a ${refinedLabel}.`;
+            alertMessage = `I ${randomChoice} that's ${refinedLabel}.`;
             alertTitle = `Object Detected: ${refinedLabel}`; // More specific title
         } else if (originalObjects && originalObjects.length > 0) {
             // Fallback: Generate sentence from the original list (if refinement failed or wasn't specific)
@@ -194,7 +205,7 @@ export default function WelcomeScreen() {
     return (
         <View style={styles.container}>
                     <TouchableOpacity style={styles.logoContainer} onPress={HandleAnalyzeAgain}>
-                        <Image style={styles.logo} source={require('../assets/images/vision.png')} />
+                        <Image style={styles.logo} source={require('../assets/images/vision2.png')} />
                     </TouchableOpacity>
                     <Text style={styles.promptText}>Tap the logo to analyze your surroundings or your emotion.</Text>
         </View>
@@ -207,12 +218,12 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#141414ff',
+        backgroundColor: '#ffffffff',
         paddingTop: 60,
         paddingHorizontal: 20,
     },
     logoContainer: {
-        width: '70%',
+        width: '60%',
         aspectRatio: 1.5,
         marginBottom: 30,
     },
@@ -222,7 +233,7 @@ const styles = StyleSheet.create({
         resizeMode: 'contain',
     },
     promptText: {
-        color: '#ffffffff',
+        color: '#000000ff',
         fontSize: 15,
         textAlign: 'center',
         marginTop: 10,

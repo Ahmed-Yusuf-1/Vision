@@ -16,9 +16,6 @@ export const awsConfig = {
   region: 'us-east-2', 
 };
 
-export const spotifyConfig = {
-  clientId: getExtraVar<string>('EXPO_PUBLIC_SPOTIFY_CLIENT_ID'),
-};
 export const geminiConfig = {
   apiKey: getExtraVar<string>('EXPO_PUBLIC_GEMINI_API_KEY'),
 };
