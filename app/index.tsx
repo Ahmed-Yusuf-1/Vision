@@ -1,10 +1,22 @@
+// app/index.tsx
+
+import { Audio } from 'expo-av'; // Import Audio
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native"; // Added ActivityIndicator
-import { getRefinedObjectLabel } from "../lib/gemini"; // Import the new function
+import { ActivityIndicator, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { getRefinedObjectLabel } from "../lib/gemini";
+import { fetchAudioFromText } from "../lib/googleTTS"; // Import TTS function
 
 // Define states that indicate no specific emotion was detected
 const NON_SPECIFIC_EMOTION_STATES = ['NEUTRAL', 'DEFAULT'];
+
+function getRandomArrayElement<T>(arr: T[]): T | undefined {
+    if (!arr || arr.length === 0) return undefined;
+    const index = Math.floor(Math.random() * arr.length);
+    return arr[index];
+}
+
+const choices = ["think", "believe", "suspect"];
 
 export default function WelcomeScreen() {
     const router = useRouter();
@@ -13,18 +25,27 @@ export default function WelcomeScreen() {
     const [currentEmotion, setCurrentEmotion] = useState<string | null>(null);
     const [detectedObjects, setDetectedObjects] = useState<string[]>([]);
     const [primaryDetection, setPrimaryDetection] = useState<'initial' | 'emotion' | 'objects'>('initial');
-    // State for the refined object label from Gemini
     const [refinedObjectLabel, setRefinedObjectLabel] = useState<string | null>(null);
-    // Loading state specifically for Gemini call
     const [isRefiningLabel, setIsRefiningLabel] = useState(false);
+    
+    // Keep track of the sound object to unload it later
+    const [sound, setSound] = useState<Audio.Sound | null>(null);
 
+    // Cleanup sound when component unmounts
+    useEffect(() => {
+        return () => {
+            if (sound) {
+                console.log('Unloading Sound');
+                sound.unloadAsync();
+            }
+        };
+    }, [sound]);
 
     useEffect(() => {
         let emotionResult: string | null = null;
         let objectList: string[] = [];
         let isSpecificEmotion = false;
 
-        // Reset refined label on new analysis
         setRefinedObjectLabel(null);
 
         // Process emotion
@@ -39,57 +60,80 @@ export default function WelcomeScreen() {
         // Process objects
         if (objects) {
             objectList = objects.split(',').filter(obj => obj.trim() !== '');
-            setDetectedObjects(objectList); // Store original list for potential display
-            console.log("Objects received:", objectList);
+            setDetectedObjects(objectList); 
         } else {
             setDetectedObjects([]);
         }
 
-        // --- Alert and Refinement Logic ---
+        // --- Logic Flow ---
         if (isSpecificEmotion) {
-            handleEmotionAlert(emotionResult!);
             setPrimaryDetection('emotion');
-            setIsRefiningLabel(false); // No refinement needed
+            setIsRefiningLabel(false);
+            handleEmotionResponse(emotionResult!);
         } else if (objectList.length > 0) {
-            setPrimaryDetection('objects'); // Set primary detection first
-            setIsRefiningLabel(true); // Indicate refinement is starting
+            setPrimaryDetection('objects');
+            setIsRefiningLabel(true); 
 
-            // Call Gemini asynchronously to refine the label
+            // Call Gemini to refine label
             getRefinedObjectLabel(objectList)
                 .then(refinedLabel => {
-                    if (refinedLabel && refinedLabel !== "Objects") { // Check if Gemini provided a specific label
-                         setRefinedObjectLabel(refinedLabel); // Store the refined label
-                         handleObjectAlert(refinedLabel); // Show alert with the single refined label
+                    if (refinedLabel && refinedLabel !== "Objects") { 
+                         setRefinedObjectLabel(refinedLabel); 
+                         handleObjectResponse(refinedLabel); 
                     } else {
-                        // If Gemini couldn't refine or returned "Objects", show generic alert or raw list
-                        handleObjectAlert(null, objectList); // Pass original list
-                         setRefinedObjectLabel(null); // Ensure no refined label is stored
+                        handleObjectResponse(null, objectList); 
+                         setRefinedObjectLabel(null); 
                     }
                 })
                 .catch(err => {
                     console.error("Failed to get refined label:", err);
-                    handleObjectAlert(null, objectList); // Fallback to raw list on error
+                    handleObjectResponse(null, objectList); 
                      setRefinedObjectLabel(null);
                 })
                 .finally(() => {
-                    setIsRefiningLabel(false); // Refinement finished (success or fail)
+                    setIsRefiningLabel(false); 
                 });
 
-        } else if (emotionResult) { // Neutral/Default emotion only
+        } else if (emotionResult) { 
             setPrimaryDetection('emotion');
             setIsRefiningLabel(false);
+            // Optional: Handle neutral emotion speech if desired
         } else {
             setPrimaryDetection('initial');
             setIsRefiningLabel(false);
         }
 
-    }, [emotion, objects]); // Dependencies remain the same
+    }, [emotion, objects]); 
 
-    // Alert function specifically for emotions (remains the same)
-    const handleEmotionAlert = (detectedEmotion: string) => {
-        if (detectedEmotion.toUpperCase() === 'NEUTRAL') {
-            return;
+    // Function to play TTS audio
+    const playVoiceMessage = async (text: string) => {
+        try {
+            const audioContent = await fetchAudioFromText(text);
+            
+            if (audioContent) {
+                console.log('Loading Sound');
+                
+                // Unload previous sound if exists
+                if (sound) {
+                    await sound.unloadAsync();
+                }
+
+                // Create and play new sound from base64
+                const { sound: newSound } = await Audio.Sound.createAsync(
+                    { uri: `data:audio/mp3;base64,${audioContent}` },
+                    { shouldPlay: true }
+                );
+                setSound(newSound);
+            }
+        } catch (error) {
+            console.error("Failed to play TTS:", error);
         }
+    };
+
+    // Handle Emotion Response (Speech instead of Alert)
+    const handleEmotionResponse = (detectedEmotion: string) => {
+        if (detectedEmotion.toUpperCase() === 'NEUTRAL') return;
+
         let message = "I actually don't know what you're doing right now";
         switch (detectedEmotion.toUpperCase()) {
            case 'HAPPY': message = "That smile is brighter than my future. Keep it up!"; break;
@@ -101,48 +145,49 @@ export default function WelcomeScreen() {
            case 'DISGUST': message = "That's the face of someone who just stepped on something wet while wearing socks"; break;
            case 'DEFAULT': message = "Hmm, couldn't quite read that expression."; break;
         }
-        Alert.alert("Mood Detected!", `You seem to be ${detectedEmotion.toLowerCase()}. ${message}`);
+        
+        const fullMessage = `You seem to be ${detectedEmotion.toLowerCase()}. ${message}`;
+        playVoiceMessage(fullMessage);
     };
 
-    // Updated alert function for objects - takes refined label OR original list
-    const handleObjectAlert = (refinedLabel: string | null, originalObjects?: string[]) => {
-        let alertMessage = "I couldn't identify a specific object, but I see some things.";
-        let alertTitle = "Objects Detected!";
+    // Handle Object Response (Speech instead of Alert)
+    const handleObjectResponse = (refinedLabel: string | null, originalObjects?: string[]) => {
+        let speechMessage = "I couldn't identify a specific object, but I see some things.";
+        const randomChoice = getRandomArrayElement(choices);
 
         if (refinedLabel) {
-            // Use the single refined label from Gemini
-            alertMessage = `I think that's a ${refinedLabel}.`;
-            alertTitle = `Object Detected: ${refinedLabel}`; // More specific title
+            speechMessage = `I ${randomChoice} that's ${refinedLabel}.`;
         } else if (originalObjects && originalObjects.length > 0) {
-            // Fallback: Generate sentence from the original list (if refinement failed or wasn't specific)
             if (originalObjects.length === 1) {
-                alertMessage = `I can see a ${originalObjects[0]}.`;
+                speechMessage = `I can see a ${originalObjects[0]}.`;
             } else if (originalObjects.length === 2) {
-                alertMessage = `I can see a ${originalObjects[0]} and a ${originalObjects[1]}.`;
+                speechMessage = `I can see a ${originalObjects[0]} and a ${originalObjects[1]}.`;
             } else {
                 const lastObject = originalObjects[originalObjects.length - 1];
                 const initialObjects = originalObjects.slice(0, -1);
-                alertMessage = `I can see a ${initialObjects.join(', a ')}, and a ${lastObject}.`;
+                speechMessage = `I can see a ${initialObjects.join(', a ')}, and a ${lastObject}.`;
             }
-        } else {
-            // Should not happen if called correctly, but fallback just in case
-            return;
         }
-
-        Alert.alert(alertTitle, alertMessage);
+        
+        playVoiceMessage(speechMessage);
     };
 
+    const HandleAnalyzeAgain = async () => {
+        // Stop any playing sound when navigating away
+        if (sound) {
+            await sound.stopAsync();
+            await sound.unloadAsync();
+            setSound(null);
+        }
 
-    const HandleAnalyzeAgain = () => {
         setCurrentEmotion(null);
         setDetectedObjects([]);
         setPrimaryDetection('initial');
-        setRefinedObjectLabel(null); // Reset refined label
-        setIsRefiningLabel(false); // Reset loading state
+        setRefinedObjectLabel(null);
+        setIsRefiningLabel(false);
         router.push('/capture');
     };
 
-    // Render results - show loading indicator while refining
     const renderResults = () => {
         if (isRefiningLabel) {
             return <ActivityIndicator size="large" color="#6200EE" style={{ marginVertical: 30 }} />;
@@ -150,7 +195,7 @@ export default function WelcomeScreen() {
 
        switch (primaryDetection) {
             case 'emotion':
-                 return ( /* ... emotion rendering logic ... */
+                 return ( 
                     <>
                         {currentEmotion && (
                              <Text style={styles.emotionText}>
@@ -162,7 +207,7 @@ export default function WelcomeScreen() {
                         {detectedObjects.length > 0 && (
                             <View style={[styles.objectsSection, styles.secondaryInfo]}>
                                 <Text style={styles.objectsTitle}>Also Detected:</Text>
-                                {detectedObjects.slice(0, 3).map((obj, index) => ( // Show original list here
+                                {detectedObjects.slice(0, 3).map((obj, index) => (
                                     <Text key={index} style={styles.objectItem}>- {obj}</Text>
                                 ))}
                                 {detectedObjects.length > 3 && <Text style={styles.objectItem}>...</Text>}
@@ -171,13 +216,12 @@ export default function WelcomeScreen() {
                     </>
                  );
             case 'objects':
-                 return ( // Display refined label if available, otherwise original list
+                 return ( 
                      <View style={styles.objectsSection}>
                         <Text style={styles.objectsTitle}>Detected:</Text>
                         {refinedObjectLabel ? (
                             <Text style={styles.objectItem}>{refinedObjectLabel}</Text>
                         ) : (
-                            // Fallback to showing original list if refinement failed/was generic
                             detectedObjects.map((obj, index) => (
                                 <Text key={index} style={styles.objectItem}>- {obj}</Text>
                             ))
@@ -190,31 +234,34 @@ export default function WelcomeScreen() {
         }
     };
 
-    // Main render logic (remains the same)
     return (
         <View style={styles.container}>
-                    <TouchableOpacity style={styles.logoContainer} onPress={HandleAnalyzeAgain}>
-                        <Image style={styles.logo} source={require('../assets/images/vision.png')} />
-                    </TouchableOpacity>
-                    <Text style={styles.promptText}>Tap the logo to analyze your surroundings or your emotion.</Text>
+            <TouchableOpacity style={styles.logoContainer} onPress={HandleAnalyzeAgain}>
+                <Image style={styles.logo} source={require('../assets/images/vision.png')} />
+            </TouchableOpacity>
+            
+            <View style={styles.resultsContainer}>
+                {renderResults()}
+            </View>
+
+            <Text style={styles.promptText}>Tap the logo to analyze your surroundings or your emotion.</Text>
         </View>
     );
 }
 
-// --- Styles remain the same ---
 const styles = StyleSheet.create({
     container: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#141414ff',
+        backgroundColor: '#ffffffff',
         paddingTop: 60,
         paddingHorizontal: 20,
     },
     logoContainer: {
-        width: '70%',
+        width: '60%',
         aspectRatio: 1.5,
-        marginBottom: 30,
+        marginBottom: 10, // Reduced margin
     },
     logo: {
         width: '100%',
@@ -222,17 +269,16 @@ const styles = StyleSheet.create({
         resizeMode: 'contain',
     },
     promptText: {
-        color: '#ffffffff',
+        color: '#000000ff',
         fontSize: 15,
         textAlign: 'center',
-        marginTop: 10,
+        marginTop: 20,
     },
     resultsContainer: {
-        flexGrow: 1,
+        minHeight: 150, // Reserve space for results
         width: '100%',
         justifyContent: 'center',
         alignItems: 'center',
-        paddingVertical: 20,
     },
     emotionText: {
         color: '#111',
@@ -257,25 +303,11 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#555',
         marginBottom: 5,
-        textAlign: 'center', // Center single refined label or list items
+        textAlign: 'center', 
     },
     secondaryInfo: {
         opacity: 0.7,
         marginTop: 10,
         marginBottom: 20,
     },
-    retryButton: {
-        backgroundColor: '#6200EE',
-        borderRadius: 25,
-        paddingVertical: 12,
-        paddingHorizontal: 35,
-        alignItems: 'center',
-        marginTop: 20,
-        minWidth: 150,
-    },
-    retryButtonText: {
-        color: 'white',
-        fontSize: 16,
-        fontWeight: 'bold',
-    }
 });
