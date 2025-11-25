@@ -45,6 +45,7 @@ export default function WelcomeScreen() {
         let emotionResult: string | null = null;
         let objectList: string[] = [];
         let isSpecificEmotion = false;
+        
 
         setRefinedObjectLabel(null);
 
