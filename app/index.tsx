@@ -157,7 +157,7 @@ export default function WelcomeScreen() {
         const randomChoice = getRandomArrayElement(choices);
 
         if (refinedLabel) {
-            speechMessage = `I ${randomChoice} that's ${refinedLabel}.`;
+            speechMessage = `I ${randomChoice} that's a ${refinedLabel}.`;
         } else if (originalObjects && originalObjects.length > 0) {
             if (originalObjects.length === 1) {
                 speechMessage = `I can see a ${originalObjects[0]}.`;
